@@ -3,6 +3,7 @@
 
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -10,6 +11,7 @@ import {
 } from 'react';
 import {
   AlertTriangle,
+  GripVertical,
   ImagePlus,
   Pause,
   Play,
@@ -17,7 +19,6 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { generateShader } from '@/lib/matchbox/generator';
 import type { ProjectV1 } from '@/lib/matchbox/types';
 
@@ -39,12 +40,14 @@ export const PreviewCanvas = forwardRef<
   PreviewCanvasHandle,
   PreviewCanvasProps
 >(function PreviewCanvas({ project, onCompileState }, ref) {
+  const previewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const frameRef = useRef<number | null>(null);
   const startRef = useRef(performance.now());
   const [playing, setPlaying] = useState(false);
   const [wipe, setWipe] = useState(0.5);
+  const [dragging, setDragging] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pattern, setPattern] = useState<TestPattern>('gradient');
   const [error, setError] = useState<string>();
@@ -162,18 +165,69 @@ export const PreviewCanvas = forwardRef<
     image.src = url;
   };
 
+  const updateWipeFromClientX = useCallback((clientX: number) => {
+    const preview = previewRef.current;
+    if (!preview) return;
+    const bounds = preview.getBoundingClientRect();
+    const nextWipe = (clientX - bounds.left) / bounds.width;
+    setWipe(Math.min(1, Math.max(0, nextWipe)));
+  }, []);
+
   return (
-    <div className="checkerboard relative h-full min-h-[360px] overflow-hidden rounded-xl border border-[#31343b] shadow-2xl">
+    <div
+      ref={previewRef}
+      className="checkerboard relative h-full min-h-[360px] overflow-hidden rounded-xl border border-[#31343b] shadow-2xl"
+    >
       <canvas
         ref={canvasRef}
         className="h-full w-full transition-transform duration-200"
         style={{ transform: `scale(${zoom})` }}
         aria-label="Matchbox WebGL preview"
       />
-      <div
-        className="pointer-events-none absolute inset-y-0 w-px bg-white/90 shadow-[0_0_0_1px_rgb(0_0_0/60%)]"
+      <button
+        type="button"
+        className={`group absolute inset-y-0 z-10 w-8 -translate-x-1/2 cursor-col-resize touch-none focus-visible:outline-none ${dragging ? 'cursor-grabbing' : ''}`}
         style={{ left: `${wipe * 100}%` }}
-      />
+        aria-label="Move before after boundary"
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.currentTarget.setPointerCapture(event.pointerId);
+          setDragging(true);
+          updateWipeFromClientX(event.clientX);
+        }}
+        onPointerMove={(event) => {
+          if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+          updateWipeFromClientX(event.clientX);
+        }}
+        onPointerUp={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+          setDragging(false);
+        }}
+        onPointerCancel={() => setDragging(false)}
+        onKeyDown={(event) => {
+          const step = event.shiftKey ? 0.1 : 0.02;
+          if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            setWipe((value) => Math.max(0, value - step));
+          } else if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            setWipe((value) => Math.min(1, value + step));
+          } else if (event.key === 'Home') {
+            event.preventDefault();
+            setWipe(0);
+          } else if (event.key === 'End') {
+            event.preventDefault();
+            setWipe(1);
+          }
+        }}
+      >
+        <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/90 shadow-[0_0_0_1px_rgb(0_0_0/60%)] transition-colors group-hover:bg-[#ffb15f] group-focus-visible:bg-[#ffb15f]" />
+        <span className="absolute left-1/2 top-1/2 flex size-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/75 text-white/80 shadow-lg transition group-hover:border-[#ffb15f] group-hover:text-[#ffb15f] group-focus-visible:border-[#ffb15f] group-focus-visible:text-[#ffb15f]">
+          <GripVertical className="size-4" aria-hidden="true" />
+        </span>
+      </button>
       <div className="absolute left-3 top-3 rounded bg-black/65 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/80">
         Before
       </div>
@@ -185,7 +239,7 @@ export const PreviewCanvas = forwardRef<
           <AlertTriangle className="size-4 shrink-0" /> {error}
         </div>
       )}
-      <div className="absolute bottom-3 left-1/2 flex w-[min(92%,520px)] -translate-x-1/2 items-center gap-3 rounded-lg border border-white/10 bg-black/75 p-2 backdrop-blur">
+      <div className="absolute bottom-3 left-1/2 z-20 flex w-[min(92%,520px)] -translate-x-1/2 items-center gap-3 rounded-lg border border-white/10 bg-black/75 p-2 backdrop-blur">
         <Button
           size="icon-sm"
           variant="ghost"
@@ -194,17 +248,6 @@ export const PreviewCanvas = forwardRef<
         >
           {playing ? <Pause /> : <Play />}
         </Button>
-        <Slider
-          className="flex-1"
-          value={[wipe]}
-          min={0}
-          max={1}
-          step={0.01}
-          onValueChange={(values) =>
-            setWipe(Array.isArray(values) ? values[0] : values)
-          }
-          aria-label="Before after wipe"
-        />
         <select
           value={pattern}
           onChange={(event) => {
