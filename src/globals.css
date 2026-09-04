@@ -1,0 +1,99 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@xyflow/react/dist/style.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, monospace;
+}
+
+:root,
+.dark {
+  --background: #101113;
+  --foreground: #f4f2ed;
+  --card: #17191d;
+  --card-foreground: #f4f2ed;
+  --popover: #1b1d22;
+  --popover-foreground: #f4f2ed;
+  --primary: #ff7a1a;
+  --primary-foreground: #130b05;
+  --secondary: #272a30;
+  --secondary-foreground: #f4f2ed;
+  --muted: #202329;
+  --muted-foreground: #9da1aa;
+  --accent: #332417;
+  --accent-foreground: #ffb479;
+  --destructive: #ff5f57;
+  --border: #30333a;
+  --input: #343840;
+  --ring: #ff8b3d;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply bg-background font-sans;
+    color-scheme: dark;
+  }
+  body {
+    @apply min-h-screen bg-background text-foreground antialiased;
+  }
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+  ::selection {
+    background: rgb(255 122 26 / 35%);
+  }
+}
+
+.checkerboard {
+  background-color: #16181c;
+  background-image:
+    linear-gradient(45deg, #202329 25%, transparent 25%),
+    linear-gradient(-45deg, #202329 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #202329 75%),
+    linear-gradient(-45deg, transparent 75%, #202329 75%);
+  background-size: 22px 22px;
+  background-position:
+    0 0,
+    0 11px,
+    11px -11px,
+    -11px 0;
+}
+
+.panel-grid {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgb(255 255 255 / 7%) 1px,
+    transparent 0
+  );
+  background-size: 18px 18px;
+}

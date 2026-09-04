@@ -1,0 +1,17 @@
+project_id = "dg-matchbox-builder"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://71233.github.io/dg-matchbox-builder/"]
+
+[functions.submit-project]
+verify_jwt = true
+
+[functions.review-project]
+verify_jwt = true
