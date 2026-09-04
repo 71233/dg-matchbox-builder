@@ -43,14 +43,32 @@ export const PreviewCanvas = forwardRef<
   const previewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const onCompileStateRef = useRef<PreviewCanvasProps['onCompileState']>(null);
+  const compileStateRef =
+    useRef<Parameters<NonNullable<PreviewCanvasProps['onCompileState']>>[0]>(
+      null,
+    );
   const frameRef = useRef<number | null>(null);
   const startRef = useRef(performance.now());
-  const [playing, setPlaying] = useState(false);
+  const [playing, setPlaying] = useState(true);
   const [wipe, setWipe] = useState(0.5);
   const [dragging, setDragging] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pattern, setPattern] = useState<TestPattern>('gradient');
   const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    onCompileStateRef.current = onCompileState;
+  }, [onCompileState]);
+
+  const reportCompileState = useCallback(
+    (state: Parameters<NonNullable<PreviewCanvasProps['onCompileState']>>[0]) => {
+      if (compileStateRef.current === state) return;
+      compileStateRef.current = state;
+      onCompileStateRef.current?.(state);
+    },
+    [],
+  );
 
   useImperativeHandle(
     ref,
@@ -80,7 +98,7 @@ export const PreviewCanvas = forwardRef<
     });
     if (!gl) {
       setError('WebGL 2 is unavailable. Export remains available.');
-      onCompileState?.('unavailable');
+      reportCompileState('unavailable');
       return;
     }
     const generated = generateShader(project);
@@ -97,6 +115,7 @@ export const PreviewCanvas = forwardRef<
       gl.useProgram(program);
       gl.enableVertexAttribArray(position);
       gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+      const frontHasImage = Boolean(imageRef.current);
       const textures = [
         createPatternTexture(gl, imageRef.current, 0, pattern),
         createPatternTexture(gl, null, 1, 'gradient'),
@@ -127,9 +146,14 @@ export const PreviewCanvas = forwardRef<
           width,
           height,
         );
+        const time = (performance.now() - startRef.current) / 1000;
+        if (!frontHasImage && pattern === 'gradient') {
+          updatePatternTexture(gl, textures[0], 0, pattern, time);
+        }
+        updatePatternTexture(gl, textures[1], 1, 'gradient', time * 0.65);
         gl.uniform1f(
           gl.getUniformLocation(program, 'u_time'),
-          (performance.now() - startRef.current) / 1000,
+          time,
         );
         gl.uniform1f(gl.getUniformLocation(program, 'u_wipe'), wipe);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -137,7 +161,7 @@ export const PreviewCanvas = forwardRef<
       };
       render();
       setError(undefined);
-      onCompileState?.('passed');
+      reportCompileState('passed');
       return () => {
         if (frameRef.current) cancelAnimationFrame(frameRef.current);
         textures.forEach((texture) => gl.deleteTexture(texture));
@@ -147,9 +171,9 @@ export const PreviewCanvas = forwardRef<
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
       setError(message);
-      onCompileState?.('failed');
+      reportCompileState('failed');
     }
-  }, [project, playing, wipe, pattern, onCompileState]);
+  }, [project, playing, wipe, pattern, reportCompileState]);
 
   const loadImage = (file?: File) => {
     if (!file || !file.type.startsWith('image/')) return;
@@ -345,52 +369,79 @@ function createPatternTexture(
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   if (image)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-  else {
-    const size = 256;
-    const pixels = new Uint8Array(size * size * 4);
-    for (let y = 0; y < size; y++)
-      for (let x = 0; x < size; x++) {
-        const i = (y * size + x) * 4;
-        const band = Math.sin(x * 0.05 + y * 0.025) * 0.5 + 0.5;
-        const bar = Math.min(6, Math.floor((x / size) * 7));
-        const barColors = [
-          [191, 191, 191],
-          [191, 191, 0],
-          [0, 191, 191],
-          [0, 191, 0],
-          [191, 0, 191],
-          [191, 0, 0],
-          [0, 0, 191],
-        ];
-        const rgb =
-          pattern === 'black'
-            ? [0, 0, 0]
-            : pattern === 'white'
-              ? [255, 255, 255]
-              : pattern === 'bars'
-                ? barColors[bar]
-                : variant
-                  ? [35 + x / 2, 55 + y / 2, 110]
-                  : [35 + x * 0.75, 22 + y * 0.52, 40 + band * 150];
-        pixels[i] = rgb[0];
-        pixels[i + 1] = rgb[1];
-        pixels[i + 2] = rgb[2];
-        pixels[i + 3] =
-          pattern === 'transparent' ? Math.round((x / size) * 255) : 255;
-      }
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      size,
-      size,
-      0,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      pixels,
-    );
-  }
+  else updatePatternTexture(gl, texture, variant, pattern, 0);
   return texture;
+}
+
+function updatePatternTexture(
+  gl: WebGL2RenderingContext,
+  texture: WebGLTexture,
+  variant: number,
+  pattern: TestPattern,
+  time: number,
+) {
+  const size = 256;
+  const pixels = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const bar = Math.min(6, Math.floor((x / size) * 7));
+      const barColors = [
+        [191, 191, 191],
+        [191, 191, 0],
+        [0, 191, 191],
+        [0, 191, 0],
+        [191, 0, 191],
+        [191, 0, 0],
+        [0, 0, 191],
+      ];
+      const rgb =
+        pattern === 'black'
+          ? [0, 0, 0]
+          : pattern === 'white'
+            ? [255, 255, 255]
+            : pattern === 'bars'
+              ? barColors[bar]
+              : animatedGradientColor(x, y, size, variant, time);
+      pixels[i] = rgb[0];
+      pixels[i + 1] = rgb[1];
+      pixels[i + 2] = rgb[2];
+      pixels[i + 3] =
+        pattern === 'transparent' ? Math.round((x / size) * 255) : 255;
+    }
+  gl.activeTexture(gl.TEXTURE0 + variant);
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    size,
+    size,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    pixels,
+  );
+}
+
+function animatedGradientColor(
+  x: number,
+  y: number,
+  size: number,
+  variant: number,
+  time: number,
+) {
+  const u = x / Math.max(1, size - 1);
+  const v = y / Math.max(1, size - 1);
+  const wave = Math.sin(u * 6.5 + v * 3.25 + time * 0.9) * 0.5 + 0.5;
+  const sweep = Math.sin((u - v) * 4.2 - time * 0.55) * 0.5 + 0.5;
+  return variant
+    ? [30 + u * 128 + sweep * 42, 44 + v * 118 + wave * 48, 102 + wave * 92]
+    : [
+        30 + u * 150 + sweep * 48,
+        18 + v * 126 + wave * 36,
+        42 + wave * 142,
+      ];
 }
 
 function createMatteTexture(gl: WebGL2RenderingContext) {
