@@ -4,10 +4,9 @@ import { useEffect, useState } from 'react';
 import { GitBranch, Heart, LogIn, Mail, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { Locale } from '@/lib/matchbox/types';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
 
-export function AccountPage({ locale }: { locale: Locale }) {
+export function AccountPage() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [userEmail, setUserEmail] = useState<string>();
@@ -25,9 +24,7 @@ export function AccountPage({ locale }: { locale: Locale }) {
     const client = getSupabase();
     if (!client)
       return setMessage(
-        locale === 'ja'
-          ? 'Supabaseの公開設定を追加するとログインを利用できます。'
-          : 'Add the public Supabase configuration to enable sign-in.',
+        'Add the public Supabase configuration to enable sign-in.',
       );
     const { error } = await client.auth.signInWithOtp({
       email,
@@ -36,21 +33,12 @@ export function AccountPage({ locale }: { locale: Locale }) {
           window.location.origin + window.location.pathname + '#/account',
       },
     });
-    setMessage(
-      error?.message ??
-        (locale === 'ja'
-          ? '確認メールを送りました。'
-          : 'Check your email for the sign-in link.'),
-    );
+    setMessage(error?.message ?? 'Check your email for the sign-in link.');
   };
   const github = async () => {
     const client = getSupabase();
     if (!client) {
-      setMessage(
-        locale === 'ja'
-          ? 'Supabaseの公開設定が必要です。'
-          : 'Supabase configuration is required.',
-      );
+      setMessage('Supabase configuration is required.');
       return;
     }
     await client.auth.signInWithOAuth({
@@ -72,21 +60,13 @@ export function AccountPage({ locale }: { locale: Locale }) {
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             <Panel
               icon={<UploadCloud />}
-              title={locale === 'ja' ? '投稿' : 'Submissions'}
-              body={
-                locale === 'ja'
-                  ? '審査中・公開済みの作品はSupabase接続後にここへ表示されます。'
-                  : 'Submitted and published projects appear here.'
-              }
+              title="Submissions"
+              body="Submitted and published projects appear here."
             />
             <Panel
               icon={<Heart />}
-              title={locale === 'ja' ? 'お気に入り' : 'Favorites'}
-              body={
-                locale === 'ja'
-                  ? '保存したコミュニティ作品をすぐ開けます。'
-                  : 'Quickly reopen saved community projects.'
-              }
+              title="Favorites"
+              body="Quickly reopen saved community projects."
             />
           </div>
           <Button
@@ -96,7 +76,7 @@ export function AccountPage({ locale }: { locale: Locale }) {
               void getSupabase()?.auth.signOut();
             }}
           >
-            {locale === 'ja' ? 'ログアウト' : 'Sign out'}
+            Sign out
           </Button>
         </div>
       </section>
@@ -107,13 +87,10 @@ export function AccountPage({ locale }: { locale: Locale }) {
         <div className="grid size-11 place-items-center rounded-lg bg-[#2c2119] text-[#ff8b3d]">
           <LogIn />
         </div>
-        <h1 className="mt-5 text-2xl font-semibold">
-          {locale === 'ja' ? '作品を公開する' : 'Publish your work'}
-        </h1>
+        <h1 className="mt-5 text-2xl font-semibold">Publish your work</h1>
         <p className="mt-2 text-sm leading-relaxed text-[#9196a0]">
-          {locale === 'ja'
-            ? '制作と書き出しはログイン不要です。投稿、お気に入り、作者プロフィールにだけアカウントを使います。'
-            : 'Building and exporting need no account. Sign in only to submit, favorite and manage your profile.'}
+          Building and exporting need no account. Sign in only to submit,
+          favorite and manage your profile.
         </p>
         <div className="mt-6 flex gap-2">
           <Input
@@ -124,7 +101,7 @@ export function AccountPage({ locale }: { locale: Locale }) {
             className="h-10 border-[#363a42] bg-[#101215]"
           />
           <Button onClick={magicLink} disabled={!email}>
-            <Mail /> {locale === 'ja' ? '送信' : 'Send'}
+            <Mail /> Send
           </Button>
         </div>
         <div className="my-4 flex items-center gap-3 text-[10px] uppercase tracking-widest text-[#606670]">
@@ -146,9 +123,8 @@ export function AccountPage({ locale }: { locale: Locale }) {
         )}
         {!isSupabaseConfigured() && (
           <p className="mt-4 text-[10px] leading-relaxed text-[#737984]">
-            Demo mode: add VITE_SUPABASE_URL and
-            VITE_SUPABASE_PUBLISHABLE_KEY to connect the community
-            backend.
+            Demo mode: add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY
+            to connect the community backend.
           </p>
         )}
       </div>

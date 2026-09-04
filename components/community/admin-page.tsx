@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { Check, Clock3, ShieldCheck, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import type { Locale } from '@/lib/matchbox/types';
 import {
   listPendingProjects,
   reviewProject,
@@ -28,7 +27,7 @@ const DEMO: PendingProject[] = [
   },
 ];
 
-export function AdminPage({ locale }: { locale: Locale }) {
+export function AdminPage() {
   const [submissions, setSubmissions] = useState<PendingProject[]>(DEMO);
   const [message, setMessage] = useState('');
   useEffect(() => {
@@ -44,11 +43,7 @@ export function AdminPage({ locale }: { locale: Locale }) {
       if (!project.id.startsWith('demo-'))
         await reviewProject(project.id, decision);
       setSubmissions((items) => items.filter((item) => item.id !== project.id));
-      setMessage(
-        locale === 'ja'
-          ? `${project.title}を${decision === 'approved' ? '承認' : '却下'}しました。`
-          : `${project.title} was ${decision}.`,
-      );
+      setMessage(`${project.title} was ${decision}.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     }
@@ -61,9 +56,7 @@ export function AdminPage({ locale }: { locale: Locale }) {
             <p className="text-xs uppercase tracking-[0.16em] text-[#ff8b3d]">
               Moderation
             </p>
-            <h1 className="mt-2 text-3xl font-semibold">
-              {locale === 'ja' ? '投稿審査' : 'Submission review'}
-            </h1>
+            <h1 className="mt-2 text-3xl font-semibold">Submission review</h1>
           </div>
           <Badge
             variant="outline"
@@ -104,7 +97,7 @@ export function AdminPage({ locale }: { locale: Locale }) {
               </Badge>
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => void decide(item, 'approved')}>
-                  <Check /> {locale === 'ja' ? '承認' : 'Approve'}
+                  <Check /> Approve
                 </Button>
                 <Button
                   size="icon-sm"
@@ -119,9 +112,8 @@ export function AdminPage({ locale }: { locale: Locale }) {
           ))}
         </div>
         <p className="mt-4 text-xs text-[#747a84]">
-          {locale === 'ja'
-            ? '実際の承認操作は保護された app_roles とEdge Functionを通じて行われます。'
-            : 'Live decisions are enforced through protected app_roles and an Edge Function.'}
+          Live decisions are enforced through protected app_roles and an Edge
+          Function.
         </p>
         {message && <p className="mt-3 text-xs text-[#aeb2ba]">{message}</p>}
       </div>

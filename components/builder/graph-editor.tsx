@@ -26,7 +26,6 @@ interface MatchboxNodeData extends Record<string, unknown> {
 export function GraphEditor() {
   const {
     project,
-    locale,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -59,9 +58,7 @@ export function GraphEditor() {
     [project.edges],
   );
   const filtered = NODE_CATALOG.filter((entry) =>
-    `${entry.label.ja} ${entry.label.en}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
+    entry.label.en.toLowerCase().includes(search.toLowerCase()),
   );
   const valid = (connection: Connection) => {
     if (
@@ -123,9 +120,7 @@ export function GraphEditor() {
             <p className="text-[10px] uppercase tracking-[0.14em] text-[#767c86]">
               Node library
             </p>
-            <h2 className="text-sm font-semibold">
-              {locale === 'ja' ? 'ノードを追加' : 'Add a node'}
-            </h2>
+            <h2 className="text-sm font-semibold">Add a node</h2>
           </div>
           <Button
             size="icon-sm"
@@ -142,7 +137,7 @@ export function GraphEditor() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="h-8 border-[#343840] bg-[#101215] pl-7 text-xs"
-            placeholder={locale === 'ja' ? '検索' : 'Search'}
+            placeholder="Search"
           />
         </div>
         <div className="max-h-[calc(100vh-130px)] space-y-1 overflow-y-auto pr-1">
@@ -157,7 +152,7 @@ export function GraphEditor() {
               </span>
               <span>
                 <span className="block text-xs font-medium">
-                  {definition.label[locale]}
+                  {definition.label.en}
                 </span>
                 <span className="block text-[9px] uppercase text-[#6f7580]">
                   {definition.category} · {definition.cost}
@@ -208,7 +203,7 @@ function MatchboxNode({ data, selected }: NodeProps) {
       className={`min-w-40 rounded-lg border bg-[#1c1f24] shadow-lg ${selected ? 'border-[#ff7a1a] shadow-[0_0_0_2px_rgb(255_122_26/15%)]' : 'border-[#3a3e46]'}`}
     >
       <div className="flex items-center justify-between border-b border-[#343840] px-3 py-2">
-        <span className="text-xs font-semibold">{definition.label.ja}</span>
+        <span className="text-xs font-semibold">{definition.label.en}</span>
         <span className="rounded bg-[#292c32] px-1.5 py-0.5 text-[8px] uppercase text-[#8d929c]">
           P{projectNode.pass}
         </span>

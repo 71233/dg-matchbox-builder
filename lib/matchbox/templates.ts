@@ -37,7 +37,7 @@ const makeProject = (
   description: '',
   category,
   target: 'flame-2025.1+',
-  locale: 'ja',
+  locale: 'en',
   nodes: chain.map((definitionId, index) => ({
     id: `${definitionId}-${index}`,
     definitionId,

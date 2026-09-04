@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TEMPLATES } from '@/lib/matchbox/templates';
 import { instantiateProject } from '@/lib/matchbox/project';
-import type { Locale, ProjectV1 } from '@/lib/matchbox/types';
+import type { ProjectV1 } from '@/lib/matchbox/types';
 import {
   listApprovedProjects,
   type GalleryProject,
@@ -36,11 +36,9 @@ const DEMO: GalleryProject[] = TEMPLATES.map((template, index) => ({
 }));
 
 export function GalleryPage({
-  locale,
   onRemix,
   onOpen,
 }: {
-  locale: Locale;
   onRemix: (project: ProjectV1) => void;
   onOpen: (project: GalleryProject) => void;
 }) {
@@ -82,14 +80,11 @@ export function GalleryPage({
               Community library
             </p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-              {locale === 'ja'
-                ? '作って、学んで、リミックス'
-                : 'Build, learn and remix'}
+              Build, learn and remix
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-[#8e939d]">
-              {locale === 'ja'
-                ? '検証済みノードから作られたMatchboxを開き、構成を学び、自分の作品として発展させられます。'
-                : 'Open Matchboxes built from verified nodes, learn their structure and make them your own.'}
+              Open Matchboxes built from verified nodes, learn their structure
+              and make them your own.
             </p>
           </div>
           <Badge
@@ -106,11 +101,7 @@ export function GalleryPage({
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="h-10 border-[#343840] bg-[#101215] pl-9"
-              placeholder={
-                locale === 'ja'
-                  ? '作品、用途、作者を検索'
-                  : 'Search projects, purpose or author'
-              }
+              placeholder="Search projects, purpose or author"
             />
           </div>
           <div className="flex items-center gap-2 overflow-x-auto">
@@ -134,12 +125,10 @@ export function GalleryPage({
             <select
               value={passes}
               onChange={(event) => setPasses(event.target.value)}
-              aria-label={locale === 'ja' ? 'パス数' : 'Pass count'}
+              aria-label="Pass count"
               className="h-9 rounded-md border border-[#343840] bg-[#101215] px-2 text-xs"
             >
-              <option value="all">
-                {locale === 'ja' ? '全パス' : 'All passes'}
-              </option>
+              <option value="all">All passes</option>
               {[1, 2, 3, 4].map((value) => (
                 <option key={value} value={value}>
                   {value} pass
@@ -151,15 +140,11 @@ export function GalleryPage({
               onChange={(event) =>
                 setSort(event.target.value as 'newest' | 'popular')
               }
-              aria-label={locale === 'ja' ? '並び順' : 'Sort order'}
+              aria-label="Sort order"
               className="h-9 rounded-md border border-[#343840] bg-[#101215] px-2 text-xs"
             >
-              <option value="newest">
-                {locale === 'ja' ? '新着順' : 'Newest'}
-              </option>
-              <option value="popular">
-                {locale === 'ja' ? '人気順' : 'Popular'}
-              </option>
+              <option value="newest">Newest</option>
+              <option value="popular">Popular</option>
             </select>
           </div>
         </div>
@@ -223,7 +208,7 @@ export function GalleryPage({
                   className="flex-1 border-[#383c44] bg-[#1d2025]"
                   onClick={() => project.document && onRemix(project.document)}
                 >
-                  <Copy /> {locale === 'ja' ? 'この作品から作る' : 'Remix'}
+                  <Copy /> Remix
                 </Button>
                 <Button
                   variant="ghost"

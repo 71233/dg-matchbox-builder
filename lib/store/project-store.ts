@@ -45,18 +45,19 @@ interface ProjectStore {
 const initial = instantiateProject(TEMPLATES[0].project);
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   project: initial,
-  locale: 'ja',
+  locale: 'en',
   graphOpen: false,
   chooseTemplate: (templateId) => {
     const template =
       TEMPLATES.find((entry) => entry.id === templateId) ?? TEMPLATES[0];
     set({
-      project: instantiateProject(template.project, get().locale),
+      project: instantiateProject(template.project, 'en'),
       selectedNodeId: undefined,
     });
   },
   setProject: (project) => set({ project }),
-  setLocale: (locale) => set({ locale, project: { ...get().project, locale } }),
+  setLocale: () =>
+    set({ locale: 'en', project: { ...get().project, locale: 'en' } }),
   selectNode: (selectedNodeId) => set({ selectedNodeId }),
   setGraphOpen: (graphOpen) => set({ graphOpen }),
   addNode: (definitionId) =>
@@ -112,7 +113,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       },
     })),
   toggleExposed: (nodeId, parameterId) =>
-    set(({ project, locale }) => {
+    set(({ project }) => {
       const existing = project.exposedParameters.find(
         (entry) => entry.nodeId === nodeId && entry.parameterId === parameterId,
       );
@@ -143,8 +144,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
               id: `${nodeId}:${parameterId}`,
               nodeId,
               parameterId,
-              displayName: parameter.label[locale],
-              tooltip: parameter.tooltip[locale],
+              displayName: parameter.label.en,
+              tooltip: parameter.tooltip.en,
               page: Math.floor(index / 30),
               column: Math.floor((index % 30) / 5),
               row: index % 5,

@@ -1,17 +1,14 @@
 'use client';
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   Boxes,
   CheckCircle2,
-  ChevronDown,
   CircleHelp,
   Code2,
   Download,
   GalleryVerticalEnd,
   Flag,
-  Globe2,
   Heart,
   LogIn,
   Save,
@@ -46,7 +43,6 @@ import type {
   ProjectNode,
   ProjectV1,
 } from '@/lib/matchbox/types';
-import '@/lib/i18n/client';
 
 type Route = 'builder' | 'gallery' | 'learn' | 'account' | 'admin';
 
@@ -70,43 +66,26 @@ const AdminPage = lazy(() =>
 );
 
 const COPY = {
-  ja: {
-    builder: 'ビルダー',
-    gallery: 'ギャラリー',
-    learn: '学ぶ',
-    account: 'アカウント',
-    export: '書き出す',
-    publish: '公開申請',
-    recipe: '何を作りますか？',
-    quick: 'ルックを調整',
-    graph: 'グラフを開く',
-    saved: 'この端末に自動保存',
-    private: '素材は公開操作をするまで端末の外へ送信されません。',
-  },
-  en: {
-    builder: 'Builder',
-    gallery: 'Gallery',
-    learn: 'Learn',
-    account: 'Account',
-    export: 'Export',
-    publish: 'Submit',
-    recipe: 'What will you build?',
-    quick: 'Shape the look',
-    graph: 'Open graph',
-    saved: 'Autosaved on this device',
-    private: 'Your media stays on this device until you explicitly publish.',
-  },
+  builder: 'Builder',
+  gallery: 'Gallery',
+  learn: 'Learn',
+  account: 'Account',
+  export: 'Export',
+  publish: 'Submit',
+  recipe: 'What will you build?',
+  quick: 'Shape the look',
+  graph: 'Open graph',
+  saved: 'Autosaved on this device',
+  private: 'Your media stays on this device until you explicitly publish.',
 };
+
+const DISPLAY_LOCALE: Locale = 'en';
 
 export function BuilderShell() {
   const [route, setRoute] = useState<Route>('builder');
   const [galleryProject, setGalleryProject] = useState<GalleryProject>();
-  const { locale, setLocale, setProject } = useProjectStore();
-  const { i18n } = useTranslation();
-  const t = COPY[locale];
-  useEffect(() => {
-    void i18n.changeLanguage(locale);
-  }, [i18n, locale]);
+  const { setProject } = useProjectStore();
+  const t = COPY;
   useEffect(() => {
     const sync = () =>
       setRoute(
@@ -125,23 +104,17 @@ export function BuilderShell() {
   };
   const remix = (project: ProjectV1) => {
     setProject({
-      ...instantiateProject(project, locale),
+      ...instantiateProject(project, DISPLAY_LOCALE),
       parentProjectId: project.id,
       title: `${project.title} Remix`,
     });
     navigate('builder');
   };
 
-  useWebMcp(locale, setProject, navigate);
+  useWebMcp(setProject, navigate);
   return (
     <main className="min-h-screen bg-[#101113] pb-14 text-[#f4f2ed] md:pb-0">
-      <Header
-        route={route}
-        locale={locale}
-        t={t}
-        navigate={navigate}
-        toggleLocale={() => setLocale(locale === 'ja' ? 'en' : 'ja')}
-      />
+      <Header route={route} t={t} navigate={navigate} />
       <Suspense
         fallback={
           <div className="grid min-h-[calc(100vh-56px)] place-items-center text-sm text-[#8e939d]">
@@ -150,27 +123,18 @@ export function BuilderShell() {
         }
       >
         {route === 'builder' && (
-          <BuilderWorkspace
-            locale={locale}
-            t={t}
-            onAccount={() => navigate('account')}
-          />
+          <BuilderWorkspace t={t} onAccount={() => navigate('account')} />
         )}
         {route === 'gallery' && (
-          <GalleryPage
-            locale={locale}
-            onRemix={remix}
-            onOpen={setGalleryProject}
-          />
+          <GalleryPage onRemix={remix} onOpen={setGalleryProject} />
         )}
-        {route === 'learn' && <LearnPage locale={locale} />}
-        {route === 'account' && <AccountPage locale={locale} />}
-        {route === 'admin' && <AdminPage locale={locale} />}
+        {route === 'learn' && <LearnPage />}
+        {route === 'account' && <AccountPage />}
+        {route === 'admin' && <AdminPage />}
       </Suspense>
       {galleryProject && (
         <GalleryDetail
           project={galleryProject}
-          locale={locale}
           onClose={() => setGalleryProject(undefined)}
           onRemix={() =>
             galleryProject.document && remix(galleryProject.document)
@@ -209,16 +173,12 @@ export function BuilderShell() {
 
 function Header({
   route,
-  locale,
   t,
   navigate,
-  toggleLocale,
 }: {
   route: Route;
-  locale: Locale;
-  t: typeof COPY.ja;
+  t: typeof COPY;
   navigate: (route: Route) => void;
-  toggleLocale: () => void;
 }) {
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-[#2b2e34] bg-[#14161a]/95 px-4 backdrop-blur">
@@ -272,14 +232,6 @@ function Header({
       </nav>
       <div className="flex items-center gap-2">
         <Button
-          variant="outline"
-          size="sm"
-          className="border-[#343840] bg-[#1b1d22]"
-          onClick={toggleLocale}
-        >
-          <Globe2 /> {locale.toUpperCase()} <ChevronDown />
-        </Button>
-        <Button
           variant="ghost"
           size="icon-sm"
           onClick={() => navigate('account')}
@@ -316,12 +268,10 @@ function NavButton({
 }
 
 function BuilderWorkspace({
-  locale,
   t,
   onAccount,
 }: {
-  locale: Locale;
-  t: typeof COPY.ja;
+  t: typeof COPY;
   onAccount: () => void;
 }) {
   const store = useProjectStore();
@@ -382,7 +332,7 @@ function BuilderWorkspace({
   }, [project]);
 
   const exportProject = async () => {
-    setStatus(locale === 'ja' ? 'ZIPを作成中…' : 'Building ZIP…');
+    setStatus('Building ZIP…');
     try {
       const { buildExport, downloadBlob } =
         await import('@/lib/matchbox/export');
@@ -403,36 +353,22 @@ function BuilderWorkspace({
     try {
       const parsed = parseProject(JSON.parse(await file.text()));
       setProject(parsed);
-      setStatus(
-        locale === 'ja'
-          ? 'プロジェクトを読み込みました。'
-          : 'Project imported.',
-      );
+      setStatus('Project imported.');
     } catch {
-      setStatus(
-        locale === 'ja'
-          ? '有効な.dgmb.jsonではありません。'
-          : 'This is not a valid .dgmb.json file.',
-      );
+      setStatus('This is not a valid .dgmb.json file.');
     }
   };
   const submit = async () => {
     if (!report.valid)
-      return setStatus(
-        locale === 'ja'
-          ? '公開前にエラーを修正してください。'
-          : 'Fix validation errors before submitting.',
-      );
+      return setStatus('Fix validation errors before submitting.');
     try {
-      setStatus(locale === 'ja' ? '公開申請を送信中…' : 'Submitting…');
+      setStatus('Submitting…');
       const { submitProject } = await import('@/lib/supabase/gallery');
       const result = await submitProject(
         project,
         document.querySelector('canvas')?.toDataURL('image/png'),
       );
-      setStatus(
-        `${locale === 'ja' ? '審査待ちとして送信しました' : 'Submitted for review'} · ${result.id.slice(0, 8)}`,
-      );
+      setStatus(`Submitted for review · ${result.id.slice(0, 8)}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
       onAccount();
@@ -469,14 +405,14 @@ function BuilderWorkspace({
                     style={{ background: template.accent }}
                   />
                   <span className="text-sm font-semibold">
-                    {template.title[locale]}
+                    {template.title.en}
                   </span>
                   {selected && (
                     <CheckCircle2 className="ml-auto size-4 text-[#ff8b3d]" />
                   )}
                 </div>
                 <p className="mt-1 pl-4 text-xs leading-relaxed text-[#8e939d]">
-                  {template.description[locale]}
+                  {template.description.en}
                 </p>
               </button>
             );
@@ -528,9 +464,7 @@ function BuilderWorkspace({
             >
               <CheckCircle2 />{' '}
               {report.valid
-                ? locale === 'ja'
-                  ? '構造チェック済み'
-                  : 'Structure passed'
+                ? 'Structure passed'
                 : `${report.issues.filter((entry) => entry.severity === 'error').length} errors`}
             </Badge>
             <Button
@@ -570,16 +504,12 @@ function BuilderWorkspace({
             <Send /> {t.publish}
           </Button>
           <span className="ml-auto max-w-md truncate text-[10px] text-[#818791]">
-            {status ||
-              (locale === 'ja'
-                ? 'GLSL・XML・サムネイル・検証スクリプトを生成します。'
-                : 'Generates GLSL, XML, thumbnail and validation helpers.')}
+            {status || 'Generates GLSL, XML, thumbnail and validation helpers.'}
           </span>
         </div>
         {graphOpen && <GraphEditor />}
         {codeOpen && (
           <CodePanel
-            locale={locale}
             tab={codeTab}
             setTab={setCodeTab}
             code={codeTab === 'glsl' ? generated.flame : generated.xml}
@@ -627,7 +557,6 @@ function BuilderWorkspace({
               return (
                 <div key={parameter.id} className="space-y-3">
                   <ParameterControl
-                    locale={locale}
                     parameter={parameter}
                     projectNode={selectedNode}
                     exposed={Boolean(exposed)}
@@ -640,7 +569,6 @@ function BuilderWorkspace({
                   />
                   {exposed && (
                     <FlameControlEditor
-                      locale={locale}
                       value={exposed}
                       onChange={(patch) =>
                         updateExposedParameter(exposed.id, patch)
@@ -652,9 +580,7 @@ function BuilderWorkspace({
             })}
           {!selectedDefinition?.parameters.length && (
             <p className="text-xs leading-relaxed text-[#7d838d]">
-              {locale === 'ja'
-                ? 'グラフで調整ノードを選択すると、ここにコントロールが表示されます。'
-                : 'Select an adjustable node in the graph to show its controls here.'}
+              Select an adjustable node in the graph to show its controls here.
             </p>
           )}
         </div>
@@ -710,14 +636,12 @@ function BuilderWorkspace({
 }
 
 function ParameterControl({
-  locale,
   parameter,
   projectNode,
   exposed,
   onValue,
   onExpose,
 }: {
-  locale: Locale;
   parameter: ParameterDefinition;
   projectNode: ProjectNode;
   exposed: boolean;
@@ -730,9 +654,9 @@ function ParameterControl({
       <div className="mb-2 flex items-center justify-between">
         <label
           className="text-xs font-medium text-[#c7cad0]"
-          title={parameter.tooltip[locale]}
+          title={parameter.tooltip.en}
         >
-          {parameter.label[locale]}
+          {parameter.label.en}
         </label>
         <span className="flex items-center gap-2 text-[9px] text-[#747a84]">
           Flame UI{' '}
@@ -773,11 +697,9 @@ function ParameterControl({
 }
 
 function FlameControlEditor({
-  locale,
   value,
   onChange,
 }: {
-  locale: Locale;
   value: ExposedParameter;
   onChange: (
     patch: Partial<Omit<ExposedParameter, 'id' | 'nodeId' | 'parameterId'>>,
@@ -786,20 +708,20 @@ function FlameControlEditor({
   return (
     <div className="space-y-2 rounded-lg border border-[#343840] bg-[#101215] p-3">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-[#ff9b59]">
-        {locale === 'ja' ? 'Flame UI 設定' : 'Flame UI settings'}
+        Flame UI settings
       </p>
       <Input
         value={value.displayName}
         onChange={(event) => onChange({ displayName: event.target.value })}
-        aria-label={locale === 'ja' ? '表示名' : 'Display name'}
-        placeholder={locale === 'ja' ? '表示名' : 'Display name'}
+        aria-label="Display name"
+        placeholder="Display name"
         className="h-8 text-xs"
       />
       <Input
         value={value.tooltip}
         onChange={(event) => onChange({ tooltip: event.target.value })}
-        aria-label={locale === 'ja' ? 'ツールチップ' : 'Tooltip'}
-        placeholder={locale === 'ja' ? 'ツールチップ' : 'Tooltip'}
+        aria-label="Tooltip"
+        placeholder="Tooltip"
         className="h-8 text-xs"
       />
       <div className="grid grid-cols-3 gap-2">
@@ -835,13 +757,11 @@ function FlameControlEditor({
 }
 
 function CodePanel({
-  locale,
   tab,
   setTab,
   code,
   onClose,
 }: {
-  locale: Locale;
   tab: 'glsl' | 'xml';
   setTab: (tab: 'glsl' | 'xml') => void;
   code: string;
@@ -854,9 +774,7 @@ function CodePanel({
           <p className="text-xs uppercase tracking-wider text-[#ff8b3d]">
             Read-only generated source
           </p>
-          <h2 className="text-lg font-semibold">
-            {locale === 'ja' ? '生成コード' : 'Generated code'}
-          </h2>
+          <h2 className="text-lg font-semibold">Generated code</h2>
         </div>
         <Button size="icon-sm" variant="ghost" onClick={onClose}>
           <X />
@@ -895,12 +813,10 @@ function CodePanel({
 
 function GalleryDetail({
   project,
-  locale,
   onClose,
   onRemix,
 }: {
   project: GalleryProject;
-  locale: Locale;
   onClose: () => void;
   onRemix: () => void;
 }) {
@@ -908,11 +824,7 @@ function GalleryDetail({
   const [status, setStatus] = useState('');
   const download = async () => {
     if (!project.document) {
-      setStatus(
-        locale === 'ja'
-          ? '公開ZIPがありません。'
-          : 'No public bundle is available.',
-      );
+      setStatus('No public bundle is available.');
       return;
     }
     const { buildExport, downloadBlob } = await import('@/lib/matchbox/export');
@@ -935,17 +847,15 @@ function GalleryDetail({
   };
   const report = async () => {
     if (project.id.startsWith('demo-')) {
-      setStatus(locale === 'ja' ? 'デモ作品です。' : 'This is a demo project.');
+      setStatus('This is a demo project.');
       return;
     }
-    const details = window.prompt(
-      locale === 'ja' ? '問題の内容を入力してください' : 'Describe the issue',
-    );
+    const details = window.prompt('Describe the issue');
     if (!details) return;
     try {
       const { reportProject } = await import('@/lib/supabase/gallery');
       await reportProject(project.id, details);
-      setStatus(locale === 'ja' ? '報告を送信しました。' : 'Report submitted.');
+      setStatus('Report submitted.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
@@ -992,8 +902,7 @@ function GalleryDetail({
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
               <Button onClick={onRemix}>
-                <Workflow />{' '}
-                {locale === 'ja' ? 'この作品から作る' : 'Remix this project'}
+                <Workflow /> Remix this project
               </Button>
               <Button variant="outline" onClick={() => void favorite()}>
                 <Heart /> {favorites}
@@ -1003,10 +912,10 @@ function GalleryDetail({
                 onClick={() => void download()}
                 disabled={!project.document}
               >
-                <Download /> {locale === 'ja' ? 'ZIP取得' : 'Download ZIP'}
+                <Download /> Download ZIP
               </Button>
               <Button variant="ghost" onClick={() => void report()}>
-                <Flag /> {locale === 'ja' ? '問題報告' : 'Report'}
+                <Flag /> Report
               </Button>
             </div>
             {status && <p className="mt-3 text-xs text-[#9ea3ac]">{status}</p>}
@@ -1038,37 +947,21 @@ function GalleryDetail({
   );
 }
 
-function LearnPage({ locale }: { locale: Locale }) {
-  const cards =
-    locale === 'ja'
-      ? [
-          [
-            '1. レシピから始める',
-            '目的に近い完成例を選び、結果を見ながら少数のコントロールを調整します。',
-          ],
-          [
-            '2. グラフで深掘り',
-            '画像の流れをノードで確認し、必要な処理を追加します。',
-          ],
-          [
-            '3. Flameで最終確認',
-            'ZIPの補助スクリプトでshader_builderを実行し、実機レンダーを確認します。',
-          ],
-        ]
-      : [
-          [
-            '1. Start from a recipe',
-            'Choose a working example and shape a few meaningful controls while watching the result.',
-          ],
-          [
-            '2. Go deeper in the graph',
-            'Inspect the image flow and add verified processing nodes.',
-          ],
-          [
-            '3. Confirm in Flame',
-            'Use the included helper to run shader_builder, then verify the final render in Flame.',
-          ],
-        ];
+function LearnPage() {
+  const cards = [
+    [
+      '1. Start from a recipe',
+      'Choose a working example and shape a few meaningful controls while watching the result.',
+    ],
+    [
+      '2. Go deeper in the graph',
+      'Inspect the image flow and add verified processing nodes.',
+    ],
+    [
+      '3. Confirm in Flame',
+      'Use the included helper to run shader_builder, then verify the final render in Flame.',
+    ],
+  ];
   return (
     <section className="min-h-[calc(100vh-56px)] bg-[#111316] p-8">
       <div className="mx-auto max-w-4xl">
@@ -1076,9 +969,7 @@ function LearnPage({ locale }: { locale: Locale }) {
           Learn Matchbox by making
         </p>
         <h1 className="mt-2 text-4xl font-semibold">
-          {locale === 'ja'
-            ? 'コードより先に、画から始める。'
-            : 'Start with the image, not the code.'}
+          Start with the image, not the code.
         </h1>
         <div className="mt-10 grid gap-4 md:grid-cols-3">
           {cards.map(([title, body]) => (
@@ -1098,9 +989,9 @@ function LearnPage({ locale }: { locale: Locale }) {
             Browser preview ≠ final Flame render
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[#9399a3]">
-            {locale === 'ja'
-              ? 'ブラウザではGLSL ES 3.00、FlameではGLSL 430を使用します。同じノード構成から別々に生成し、差が出やすい処理を明示します。'
-              : 'The browser uses GLSL ES 3.00 while Flame uses GLSL 430. Both are generated from the same graph, and the tool calls out operations that may differ.'}
+            The browser uses GLSL ES 3.00 while Flame uses GLSL 430. Both are
+            generated from the same graph, and the tool calls out operations
+            that may differ.
           </p>
         </div>
       </div>
@@ -1109,7 +1000,6 @@ function LearnPage({ locale }: { locale: Locale }) {
 }
 
 function useWebMcp(
-  locale: Locale,
   setProject: (project: ProjectV1) => void,
   navigate: (route: Route) => void,
 ) {
@@ -1150,7 +1040,10 @@ function useWebMcp(
               const id = (input as { templateId?: string }).templateId;
               const template = TEMPLATES.find((entry) => entry.id === id);
               if (!template) throw new Error('Unknown templateId');
-              const project = instantiateProject(template.project, locale);
+              const project = instantiateProject(
+                template.project,
+                DISPLAY_LOCALE,
+              );
               setProject(project);
               navigate('builder');
               return { projectId: project.id, templateId: id, status: 'ready' };
@@ -1163,5 +1056,5 @@ function useWebMcp(
       /* unsupported preview implementation */
     }
     return () => lifecycle.abort();
-  }, [locale, navigate, setProject]);
+  }, [navigate, setProject]);
 }

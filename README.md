@@ -10,8 +10,8 @@ A visual, local-first builder for Autodesk Flame Matchbox shaders targeting Flam
 - Live WebGL 2 before/after preview with local image input
 - Read-only generated GLSL and Matchbox XML
 - IndexedDB autosave and `.dgmb.json` import
-- Deterministic ZIP export with thumbnail, bilingual docs, licenses, and safe validation helpers
-- Bilingual builder, gallery, learning, account, and moderation surfaces
+- Deterministic ZIP export with thumbnail, English documentation, licenses, and safe validation helpers
+- English-only builder, gallery, learning, account, and moderation surfaces
 - Optional Supabase Auth, RLS, immutable revisions, favorites, and review functions
 - GitHub Pages and backend deployment workflows
 

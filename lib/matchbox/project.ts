@@ -3,7 +3,7 @@ import type { ProjectV1 } from './types';
 
 export function instantiateProject(
   template: ProjectV1,
-  locale: ProjectV1['locale'] = 'ja',
+  locale: ProjectV1['locale'] = 'en',
 ): ProjectV1 {
   const id =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto

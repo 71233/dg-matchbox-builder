@@ -62,7 +62,9 @@ export const PreviewCanvas = forwardRef<
   }, [onCompileState]);
 
   const reportCompileState = useCallback(
-    (state: Parameters<NonNullable<PreviewCanvasProps['onCompileState']>>[0]) => {
+    (
+      state: Parameters<NonNullable<PreviewCanvasProps['onCompileState']>>[0],
+    ) => {
       if (compileStateRef.current === state) return;
       compileStateRef.current = state;
       onCompileStateRef.current?.(state);
@@ -151,10 +153,7 @@ export const PreviewCanvas = forwardRef<
           updatePatternTexture(gl, textures[0], 0, pattern, time);
         }
         updatePatternTexture(gl, textures[1], 1, 'gradient', time * 0.65);
-        gl.uniform1f(
-          gl.getUniformLocation(program, 'u_time'),
-          time,
-        );
+        gl.uniform1f(gl.getUniformLocation(program, 'u_time'), time);
         gl.uniform1f(gl.getUniformLocation(program, 'u_wipe'), wipe);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         if (playing) frameRef.current = requestAnimationFrame(render);
@@ -305,7 +304,7 @@ export const PreviewCanvas = forwardRef<
         </Button>
         <label className="cursor-pointer rounded px-2 py-1 text-[10px] text-white/70 hover:bg-white/10">
           <ImagePlus className="mr-1 inline size-3" />
-          素材
+          Media
           <input
             type="file"
             accept="image/*"
@@ -437,11 +436,7 @@ function animatedGradientColor(
   const sweep = Math.sin((u - v) * 4.2 - time * 0.55) * 0.5 + 0.5;
   return variant
     ? [30 + u * 128 + sweep * 42, 44 + v * 118 + wave * 48, 102 + wave * 92]
-    : [
-        30 + u * 150 + sweep * 48,
-        18 + v * 126 + wave * 36,
-        42 + wave * 142,
-      ];
+    : [30 + u * 150 + sweep * 48, 18 + v * 126 + wave * 36, 42 + wave * 142];
 }
 
 function createMatteTexture(gl: WebGL2RenderingContext) {
