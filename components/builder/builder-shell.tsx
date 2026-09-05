@@ -1,11 +1,10 @@
-'use client';
+import { FloatingPreview } from './floating-preview';
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Boxes,
   CheckCircle2,
   CircleHelp,
-  Code2,
   Download,
   GalleryVerticalEnd,
   Flag,
@@ -278,9 +277,7 @@ function BuilderWorkspace({
   const {
     project,
     selectedNodeId,
-    graphOpen,
     chooseTemplate,
-    setGraphOpen,
     updateParameter,
     setNodePass,
     updateMetadata,
@@ -293,7 +290,51 @@ function BuilderWorkspace({
   const [compileState, setCompileState] = useState<
     'passed' | 'failed' | 'unavailable'
   >('passed');
-  const [codeOpen, setCodeOpen] = useState(false);
+  const [view, setView] = useState<'preview' | 'graph' | 'code'>('preview');
+  const [recipesOpen, setRecipesOpen] = useState(true);
+  const [controlSearch, setControlSearch] = useState('');
+  const [ready, setReady] = useState(false);
+  const [saveState, setSaveState] = useState('Loading local project…');
+  const [saveRetry, setSaveRetry] = useState(0);
+  const saveSequence = useRef(0);
+  const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    if (!selectedNodeId) return;
+    // Selection originates in the graph and synchronizes the separate inspector.
+    // oxlint-disable-next-line react/react-compiler
+    setOpenNodes((old) => ({ ...old, [selectedNodeId]: true }));
+    requestAnimationFrame(() =>
+      document
+        .getElementById('controls-' + selectedNodeId)
+        ?.scrollIntoView({ block: 'nearest' }),
+    );
+  }, [selectedNodeId]);
+  useEffect(() => {
+    const handle = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('input, textarea, select, [contenteditable=true]'))
+        return;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) useProjectStore.getState().redo();
+        else useProjectStore.getState().undo();
+      } else if (event.ctrlKey && event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        useProjectStore.getState().redo();
+      }
+    };
+    window.addEventListener('keydown', handle);
+    return () => window.removeEventListener('keydown', handle);
+  }, []);
+  const backup = async () => {
+    const { downloadBlob } = await import('@/lib/matchbox/export');
+    downloadBlob(
+      new Blob([JSON.stringify(project, null, 2)], {
+        type: 'application/json',
+      }),
+      'project.dgmb.json',
+    );
+  };
   const [codeTab, setCodeTab] = useState<'glsl' | 'xml'>('glsl');
   const [status, setStatus] = useState('');
   const report = useMemo(
@@ -301,14 +342,6 @@ function BuilderWorkspace({
     [project, compileState],
   );
   const generated = useMemo(() => generateShader(project), [project]);
-  const selectedNode =
-    project.nodes.find((entry) => entry.id === selectedNodeId) ??
-    project.nodes.find(
-      (entry) =>
-        (NODE_BY_ID.get(entry.definitionId)?.parameters.length ?? 0) > 0,
-    );
-  const selectedDefinition =
-    selectedNode && NODE_BY_ID.get(selectedNode.definitionId);
 
   useEffect(() => {
     void loadLocalProject()
@@ -321,15 +354,26 @@ function BuilderWorkspace({
           }
         }
       })
-      .catch(() => undefined);
+      .catch(() => setStatus('Could not restore the local project.'))
+      .finally(() => setReady(true));
   }, [setProject]);
   useEffect(() => {
-    const timer = setTimeout(
-      () => saveLocalProject(project).catch(() => undefined),
-      350,
-    );
+    if (!ready) return;
+    const sequence = ++saveSequence.current;
+    // Reflect the start of this asynchronous persistence operation.
+    // oxlint-disable-next-line react/react-compiler
+    setSaveState('Saving…');
+    const timer = setTimeout(() => {
+      void saveLocalProject(project)
+        .then(() => {
+          if (sequence === saveSequence.current) setSaveState('Saved locally');
+        })
+        .catch(() => {
+          if (sequence === saveSequence.current) setSaveState('Save failed');
+        });
+    }, 350);
     return () => clearTimeout(timer);
-  }, [project]);
+  }, [project, ready, saveRetry]);
 
   const exportProject = async () => {
     setStatus('Building ZIP…');
@@ -376,72 +420,80 @@ function BuilderWorkspace({
   };
 
   return (
-    <section className="grid min-h-[calc(100vh-56px)] grid-cols-1 xl:grid-cols-[270px_minmax(560px,1fr)_310px]">
-      <aside className="border-r border-[#2b2e34] bg-[#15171b] p-4">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8e939d]">
-              Start from a recipe
+    <section
+      inert={!ready}
+      className={`grid min-h-[calc(100vh-56px)] grid-cols-1 ${recipesOpen ? 'lg:grid-cols-[230px_minmax(0,1fr)_310px]' : 'lg:grid-cols-[minmax(0,1fr)_310px]'}`}
+    >
+      {recipesOpen && (
+        <aside className="border-r border-[#2b2e34] bg-[#15171b] p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8e939d]">
+                Start from a recipe
+              </p>
+              <h1 className="mt-1 text-lg font-semibold">{t.recipe}</h1>
+            </div>
+            <Sparkles className="size-5 text-[#ff8b3d]" />
+          </div>
+          <div className="space-y-2">
+            {TEMPLATES.map((template) => {
+              const selected = template.id === templateId;
+              return (
+                <button
+                  key={template.id}
+                  onClick={() => {
+                    setTemplateId(template.id);
+                    chooseTemplate(template.id);
+                  }}
+                  className={`w-full rounded-lg border p-3 text-left transition ${selected ? 'border-[#ff7a1a] bg-[#2b211a]' : 'border-[#2f3238] bg-[#1a1c21] hover:border-[#4a4e57]'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="size-2 rounded-full"
+                      style={{ background: template.accent }}
+                    />
+                    <span className="text-sm font-semibold">
+                      {template.title.en}
+                    </span>
+                    {selected && (
+                      <CheckCircle2 className="ml-auto size-4 text-[#ff8b3d]" />
+                    )}
+                  </div>
+                  <p className="mt-1 pl-4 text-xs leading-relaxed text-[#8e939d]">
+                    {template.description.en}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-5 rounded-lg border border-[#2e3239] bg-[#111317] p-3">
+            <div className="flex items-center gap-2 text-xs font-medium">
+              <Save className="size-4 text-[#8e939d]" /> {saveState}
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-[#707681]">
+              {t.private}
             </p>
-            <h1 className="mt-1 text-lg font-semibold">{t.recipe}</h1>
           </div>
-          <Sparkles className="size-5 text-[#ff8b3d]" />
-        </div>
-        <div className="space-y-2">
-          {TEMPLATES.map((template) => {
-            const selected = template.id === templateId;
-            return (
-              <button
-                key={template.id}
-                onClick={() => {
-                  setTemplateId(template.id);
-                  chooseTemplate(template.id);
-                }}
-                className={`w-full rounded-lg border p-3 text-left transition ${selected ? 'border-[#ff7a1a] bg-[#2b211a]' : 'border-[#2f3238] bg-[#1a1c21] hover:border-[#4a4e57]'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="size-2 rounded-full"
-                    style={{ background: template.accent }}
-                  />
-                  <span className="text-sm font-semibold">
-                    {template.title.en}
-                  </span>
-                  {selected && (
-                    <CheckCircle2 className="ml-auto size-4 text-[#ff8b3d]" />
-                  )}
-                </div>
-                <p className="mt-1 pl-4 text-xs leading-relaxed text-[#8e939d]">
-                  {template.description.en}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-        <div className="mt-5 rounded-lg border border-[#2e3239] bg-[#111317] p-3">
-          <div className="flex items-center gap-2 text-xs font-medium">
-            <Save className="size-4 text-[#8e939d]" /> {t.saved}
-          </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-[#707681]">
-            {t.private}
-          </p>
-        </div>
-        <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#343840] bg-[#1b1d22] px-3 py-2 text-xs hover:bg-[#23262c]">
-          <Upload className="size-3.5" /> .dgmb.json
-          <input
-            type="file"
-            accept=".json,.dgmb.json"
-            className="sr-only"
-            onChange={(event) => importProject(event.target.files?.[0])}
-          />
-        </label>
-      </aside>
+          <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#343840] bg-[#1b1d22] px-3 py-2 text-xs hover:bg-[#23262c]">
+            <Upload className="size-3.5" /> .dgmb.json
+            <input
+              type="file"
+              accept=".json,.dgmb.json"
+              className="sr-only"
+              onChange={(event) => importProject(event.target.files?.[0])}
+            />
+          </label>
+        </aside>
+      )}
 
-      <section className="relative flex min-h-[720px] flex-col bg-[#0e0f11]">
+      <section className="relative flex h-[calc(100vh-56px)] min-h-[600px] min-w-0 flex-col bg-[#0e0f11]">
         <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-[#292c32] px-4 py-2">
           <div>
             <Input
               value={project.title}
+              aria-label="Project title"
+              onFocus={store.beginEdit}
+              onBlur={store.endEdit}
               onChange={(event) =>
                 updateMetadata({ title: event.target.value })
               }
@@ -468,30 +520,119 @@ function BuilderWorkspace({
                 : `${report.issues.filter((entry) => entry.severity === 'error').length} errors`}
             </Badge>
             <Button
-              variant="outline"
               size="sm"
-              onClick={() => setCodeOpen(true)}
-              className="border-[#343840] bg-[#1a1c21]"
+              variant="ghost"
+              onClick={() => setRecipesOpen((v) => !v)}
             >
-              <Code2 /> Code
+              Recipes
             </Button>
             <Button
-              variant="outline"
               size="sm"
-              onClick={() => setGraphOpen(true)}
-              className="border-[#343840] bg-[#1a1c21]"
+              variant="ghost"
+              disabled={!store.past.length}
+              onClick={store.undo}
             >
-              <Workflow /> {t.graph}
+              Undo
             </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!store.future.length}
+              onClick={store.redo}
+            >
+              Redo
+            </Button>
+            <div
+              role="tablist"
+              tabIndex={-1}
+              aria-label="Workspace view"
+              className="flex gap-1"
+              onKeyDown={(event) => {
+                const tabs = ['preview', 'graph', 'code'] as const;
+                const index = tabs.indexOf(view);
+                const next =
+                  event.key === 'ArrowRight'
+                    ? (index + 1) % 3
+                    : event.key === 'ArrowLeft'
+                      ? (index + 2) % 3
+                      : event.key === 'Home'
+                        ? 0
+                        : event.key === 'End'
+                          ? 2
+                          : -1;
+                if (next < 0) return;
+                event.preventDefault();
+                setView(tabs[next]);
+                if (tabs[next] !== 'preview') setRecipesOpen(false);
+                (
+                  event.currentTarget.querySelectorAll('[role=tab]')[
+                    next
+                  ] as HTMLElement
+                ).focus();
+              }}
+            >
+              {(['preview', 'graph', 'code'] as const).map((tab) => (
+                <Button
+                  key={tab}
+                  role="tab"
+                  tabIndex={view === tab ? 0 : -1}
+                  aria-selected={view === tab}
+                  variant={view === tab ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => {
+                    setView(tab);
+                    if (tab !== 'preview') setRecipesOpen(false);
+                  }}
+                >
+                  {tab[0].toUpperCase() + tab.slice(1)}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
-        <div className="m-4 flex-1">
-          <PreviewCanvas
-            ref={previewRef}
-            project={project}
-            onCompileState={setCompileState}
-          />
+        <div
+          className="relative m-3 min-h-0 flex-1"
+          data-testid="editing-surface"
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              visibility: view === 'graph' ? 'visible' : 'hidden',
+              pointerEvents: view === 'graph' ? 'auto' : 'none',
+            }}
+          >
+            <GraphEditor active={view === 'graph'} />
+          </div>
+          {view === 'code' && (
+            <CodePanel
+              tab={codeTab}
+              setTab={setCodeTab}
+              code={codeTab === 'glsl' ? generated.flame : generated.xml}
+            />
+          )}
+          <FloatingPreview floating={view !== 'preview'}>
+            <PreviewCanvas
+              ref={previewRef}
+              project={project}
+              onCompileState={setCompileState}
+            />
+          </FloatingPreview>
         </div>
+        <output className="flex flex-wrap items-center gap-2 px-4 pb-2 text-xs">
+          {saveState}
+          {saveState === 'Save failed' && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSaveRetry((n) => n + 1)}
+            >
+              Retry save
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={backup}>
+            Backup project
+          </Button>
+        </output>
         <div className="mx-4 mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#2d3037] bg-[#15171b] p-3">
           <Button onClick={exportProject}>
             <Download /> {t.export} ZIP
@@ -507,82 +648,133 @@ function BuilderWorkspace({
             {status || 'Generates GLSL, XML, thumbnail and validation helpers.'}
           </span>
         </div>
-        {graphOpen && <GraphEditor />}
-        {codeOpen && (
-          <CodePanel
-            tab={codeTab}
-            setTab={setCodeTab}
-            code={codeTab === 'glsl' ? generated.flame : generated.xml}
-            onClose={() => setCodeOpen(false)}
-          />
-        )}
       </section>
 
       <aside className="border-l border-[#2b2e34] bg-[#15171b]">
         <div className="border-b border-[#2b2e34] p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8e939d]">
-              Quick controls
-            </p>
-            <Code2 className="size-4 text-[#666c76]" />
-          </div>
-          <h2 className="mt-1 text-base font-semibold">{t.quick}</h2>
+          <h2 className="mb-3 text-sm font-semibold">Node controls</h2>
+          <Input
+            aria-label="Search node controls"
+            placeholder="Search nodes or parameters"
+            value={controlSearch}
+            onChange={(e) => setControlSearch(e.target.value)}
+          />
         </div>
-        <div className="max-h-[48vh] space-y-5 overflow-y-auto p-4">
-          {selectedNode && (
-            <div>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[#747a84]">
-                Render pass
-              </p>
-              <div className="grid grid-cols-4 gap-1">
-                {[1, 2, 3, 4].map((pass) => (
-                  <button
-                    key={pass}
-                    onClick={() => setNodePass(selectedNode.id, pass)}
-                    className={`rounded border px-2 py-1 text-[10px] ${selectedNode.pass === pass ? 'border-[#ff7a1a] bg-[#2b211a] text-[#ffad72]' : 'border-[#343840] bg-[#1b1d22] text-[#8d929c]'}`}
-                  >
-                    P{pass}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {selectedNode &&
-            selectedDefinition?.parameters.map((parameter) => {
-              const exposed = project.exposedParameters.find(
-                (entry) =>
-                  entry.nodeId === selectedNode.id &&
-                  entry.parameterId === parameter.id,
+        <div
+          className="max-h-[65vh] overflow-y-auto p-3"
+          data-testid="node-controls"
+        >
+          {[...project.nodes]
+            .sort((a, b) => a.pass - b.pass)
+            .map((node) => {
+              const definition = NODE_BY_ID.get(node.definitionId)!;
+              const siblings = project.nodes.filter(
+                (n) => n.definitionId === node.definitionId,
               );
+              const name =
+                definition.label.en +
+                (siblings.length > 1
+                  ? ' ' + (siblings.findIndex((n) => n.id === node.id) + 1)
+                  : '');
+              const query = controlSearch.toLowerCase();
+              if (
+                query &&
+                !name.toLowerCase().includes(query) &&
+                !definition.parameters.some((p) =>
+                  p.label.en.toLowerCase().includes(query),
+                )
+              )
+                return null;
               return (
-                <div key={parameter.id} className="space-y-3">
-                  <ParameterControl
-                    parameter={parameter}
-                    projectNode={selectedNode}
-                    exposed={Boolean(exposed)}
-                    onValue={(value) =>
-                      updateParameter(selectedNode.id, parameter.id, value)
-                    }
-                    onExpose={() =>
-                      toggleExposed(selectedNode.id, parameter.id)
-                    }
-                  />
-                  {exposed && (
-                    <FlameControlEditor
-                      value={exposed}
-                      onChange={(patch) =>
-                        updateExposedParameter(exposed.id, patch)
-                      }
-                    />
-                  )}
-                </div>
+                <details
+                  key={node.id}
+                  id={'controls-' + node.id}
+                  open={Boolean(openNodes[node.id]) || Boolean(query)}
+                  className={
+                    'mb-2 rounded border bg-[#191c21] ' +
+                    (selectedNodeId === node.id
+                      ? 'border-[#ff8b3d]'
+                      : 'border-[#343840]')
+                  }
+                >
+                  <summary
+                    className="cursor-pointer p-3 text-sm"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setOpenNodes((old) => ({
+                        ...old,
+                        [node.id]: !old[node.id],
+                      }));
+                      store.selectNode(node.id);
+                    }}
+                  >
+                    {name}{' '}
+                    <span className="text-xs text-[#999]">· P{node.pass}</span>
+                  </summary>
+                  <div
+                    className="space-y-4 border-t border-[#343840] p-3"
+                    onBlurCapture={store.endEdit}
+                  >
+                    <label className="flex items-center justify-between text-xs">
+                      Render pass
+                      <select
+                        aria-label={name + ' render pass'}
+                        value={node.pass}
+                        onChange={(e) =>
+                          setNodePass(node.id, Number(e.target.value))
+                        }
+                      >
+                        {[1, 2, 3, 4].map((pass) => (
+                          <option key={pass} value={pass}>
+                            P{pass}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {!definition.parameters.length && (
+                      <p className="text-xs text-[#999]">
+                        No adjustable parameters.
+                      </p>
+                    )}
+                    {definition.parameters.map((parameter) => {
+                      const exposed = project.exposedParameters.find(
+                        (e) =>
+                          e.nodeId === node.id &&
+                          e.parameterId === parameter.id,
+                      );
+                      return (
+                        <div key={parameter.id} className="space-y-2">
+                          <ParameterControl
+                            parameter={parameter}
+                            projectNode={node}
+                            exposed={Boolean(exposed)}
+                            onValue={(value) =>
+                              updateParameter(node.id, parameter.id, value)
+                            }
+                            onExpose={() =>
+                              toggleExposed(node.id, parameter.id)
+                            }
+                          />
+                          {exposed && (
+                            <details>
+                              <summary className="cursor-pointer text-xs text-[#aaa]">
+                                Flame UI settings
+                              </summary>
+                              <FlameControlEditor
+                                value={exposed}
+                                onChange={(patch) =>
+                                  updateExposedParameter(exposed.id, patch)
+                                }
+                              />
+                            </details>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
               );
             })}
-          {!selectedDefinition?.parameters.length && (
-            <p className="text-xs leading-relaxed text-[#7d838d]">
-              Select an adjustable node in the graph to show its controls here.
-            </p>
-          )}
         </div>
         <div className="mx-4 border-t border-[#2c3036] py-4">
           <div className="mb-3 flex items-center justify-between">
@@ -659,6 +851,13 @@ function ParameterControl({
           {parameter.label.en}
         </label>
         <span className="flex items-center gap-2 text-[9px] text-[#747a84]">
+          <button
+            type="button"
+            className="text-xs hover:text-white"
+            onClick={() => onValue(parameter.defaultValue)}
+          >
+            Reset
+          </button>
           Flame UI{' '}
           <Switch size="sm" checked={exposed} onCheckedChange={onExpose} />
         </span>
@@ -666,18 +865,22 @@ function ParameterControl({
       {parameter.kind === 'float' ? (
         <div className="flex items-center gap-3">
           <Slider
-            className="flex-1"
+            className="flex-1 [&_[data-slot=slider-track]]:h-1 [&_[data-slot=slider-track]]:bg-[#41454c] [&_[data-slot=slider-range]]:h-full [&_[data-slot=slider-range]]:bg-[#df7a38]"
             value={[Number(value)]}
             min={parameter.min}
             max={parameter.max}
             step={parameter.step}
-            onValueChange={(values) =>
-              onValue(Array.isArray(values) ? values[0] : values)
-            }
+            onValueChange={(values) => {
+              useProjectStore.getState().beginEdit();
+              onValue(Array.isArray(values) ? values[0] : values);
+            }}
+            onValueCommitted={() => useProjectStore.getState().endEdit()}
           />
-          <span className="w-14 rounded border border-[#343840] bg-[#101215] px-1.5 py-1 text-right font-mono text-[10px]">
-            {Number(value).toFixed(2)}
-          </span>
+          <NumericParameterInput
+            parameter={parameter}
+            value={Number(value)}
+            onValue={onValue}
+          />
         </div>
       ) : parameter.kind === 'boolean' ? (
         <Switch
@@ -693,6 +896,44 @@ function ParameterControl({
         />
       )}
     </div>
+  );
+}
+
+function NumericParameterInput({
+  parameter,
+  value,
+  onValue,
+}: {
+  parameter: ParameterDefinition;
+  value: number;
+  onValue: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <Input
+      type="number"
+      aria-label={parameter.label.en + ' value'}
+      className="h-8 w-20 text-xs"
+      value={draft ?? value}
+      min={parameter.min}
+      max={parameter.max}
+      step={parameter.step}
+      onFocus={() => setDraft(String(value))}
+      onBlur={() => setDraft(null)}
+      onChange={(event) => {
+        setDraft(event.target.value);
+        const n = event.target.valueAsNumber;
+        if (Number.isFinite(n)) {
+          useProjectStore.getState().beginEdit();
+          onValue(
+            Math.max(
+              parameter.min ?? -Infinity,
+              Math.min(parameter.max ?? Infinity, n),
+            ),
+          );
+        }
+      }}
+    />
   );
 }
 
@@ -760,15 +1001,13 @@ function CodePanel({
   tab,
   setTab,
   code,
-  onClose,
 }: {
   tab: 'glsl' | 'xml';
   setTab: (tab: 'glsl' | 'xml') => void;
   code: string;
-  onClose: () => void;
 }) {
   return (
-    <div className="absolute inset-0 z-40 flex flex-col bg-[#101215]/98 p-4">
+    <div className="absolute inset-0 flex flex-col bg-[#101215]/98 p-4">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-wider text-[#ff8b3d]">
@@ -776,9 +1015,6 @@ function CodePanel({
           </p>
           <h2 className="text-lg font-semibold">Generated code</h2>
         </div>
-        <Button size="icon-sm" variant="ghost" onClick={onClose}>
-          <X />
-        </Button>
       </div>
       <div className="mb-3 flex gap-2">
         <Button

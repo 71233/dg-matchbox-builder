@@ -49,7 +49,8 @@ export const PreviewCanvas = forwardRef<
       null,
     );
   const frameRef = useRef<number | null>(null);
-  const startRef = useRef(performance.now());
+  const elapsedRef = useRef(0);
+  const tickRef = useRef(performance.now());
   const [playing, setPlaying] = useState(true);
   const [wipe, setWipe] = useState(0.5);
   const [dragging, setDragging] = useState(false);
@@ -134,6 +135,7 @@ export const PreviewCanvas = forwardRef<
           gl.uniform1i(location, value ? 1 : 0);
         else gl.uniform1f(location, value);
       }
+      tickRef.current = performance.now();
       const render = () => {
         const ratio = Math.min(window.devicePixelRatio || 1, 2);
         const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
@@ -148,7 +150,10 @@ export const PreviewCanvas = forwardRef<
           width,
           height,
         );
-        const time = (performance.now() - startRef.current) / 1000;
+        const now = performance.now();
+        if (playing) elapsedRef.current += (now - tickRef.current) / 1000;
+        tickRef.current = now;
+        const time = elapsedRef.current;
         if (!frontHasImage && pattern === 'gradient') {
           updatePatternTexture(gl, textures[0], 0, pattern, time);
         }
@@ -199,7 +204,7 @@ export const PreviewCanvas = forwardRef<
   return (
     <div
       ref={previewRef}
-      className="checkerboard relative h-full min-h-[360px] overflow-hidden rounded-xl border border-[#31343b] shadow-2xl"
+      className="checkerboard relative h-full min-h-0 overflow-hidden rounded-xl border border-[#31343b] shadow-2xl"
     >
       <canvas
         ref={canvasRef}
@@ -262,7 +267,7 @@ export const PreviewCanvas = forwardRef<
           <AlertTriangle className="size-4 shrink-0" /> {error}
         </div>
       )}
-      <div className="absolute bottom-3 left-1/2 z-20 flex w-[min(92%,520px)] -translate-x-1/2 items-center gap-3 rounded-lg border border-white/10 bg-black/75 p-2 backdrop-blur">
+      <div className="absolute bottom-3 left-1/2 z-20 flex w-[min(92%,520px)] -translate-x-1/2 flex-wrap items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/75 p-1 backdrop-blur">
         <Button
           size="icon-sm"
           variant="ghost"

@@ -2,6 +2,13 @@
 @import 'tw-animate-css';
 @import '@xyflow/react/dist/style.css';
 
+.react-flow__edge.selected .react-flow__edgeupdater {
+  fill: #ffb15f;
+  fill-opacity: 0.5;
+  stroke: #ffb15f;
+  cursor: crosshair;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
